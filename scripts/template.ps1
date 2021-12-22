@@ -113,6 +113,7 @@ function Set-TemplateValues {
         [switch]$Verbose = $false
     )
 
+    $ignoreList = @("");
     $properties = Get-TemplateProperties
     [MergeResult]$merged = $null;
 
@@ -209,7 +210,9 @@ function Set-TemplateValues {
             $directories | Where-Object {
                         $tested = Test-Name $direcoryFilters $_.Name
                         if($tested) {
-                            $toEnqueue.Add($_);
+                            if(-not $ignoreList.Contains($_.FullName)) {
+                                $toEnqueue.Add($_);
+                            }
                         }
                     };
             [Queue]$directoryQueue = New-Object Queue
@@ -248,16 +251,22 @@ function Set-TemplateValues {
                     | Set-Variable merged -Force
 
                     if ($merged.IsChanged()) {
-                        Set-Location ${directory.Parent} -Verbose:$Verbose
+                        $path = $directory.Parent
+                        Set-Location $path -Verbose:$Verbose
                         $to = $merged.NewString
-                        $directory | Rename-Item -NewName $to -ErrorAction Stop -Verbose:$Verbose -WhatIf:$WhatIf
-                        $newPath = Join-Path $directory.PSParentPath -Child $to
-                        $newPathItem = Get-Item $newPath -ErrorAction Stop -Verbose:$Verbose
-
-                        if($newPathItem) {
-                            "Renamed Directory from [$directory] to [${to}]."
+                        if(Test-Path $to) {
+                            "[$PWD\$to] already exists.  Skipping [$directory]."
+                            $ignoreList += $directory;
                         } else {
-                            throw "Failed to rename [$directory] to [$to]."
+                            $directory | Rename-Item -NewName $to -ErrorAction Stop -Verbose:$Verbose -WhatIf:$WhatIf
+                            $newPath = Join-Path $directory.PSParentPath -Child $to
+                            $newPathItem = Get-Item $newPath -ErrorAction Stop -Verbose:$Verbose
+
+                            if($newPathItem) {
+                                "Renamed Directory from [$directory] to [${to}]."
+                            } else {
+                                throw "Failed to rename [$directory] to [$to]."
+                            }
                         }
 
                         $queue = Get-DirectoriesToRename;
