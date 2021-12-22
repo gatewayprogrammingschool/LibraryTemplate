@@ -249,6 +249,11 @@ function Set-TemplateValues {
                     }
                 }
             }
+            catch {
+                $Err = $_
+                $Err
+                throw $Err
+            }
             finally {
                 Pop-Location
             }
