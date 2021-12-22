@@ -206,13 +206,23 @@ function Set-TemplateValues {
             # Each time we rename a directory we start over.
             $directories = Get-ChildItem -Directory -Path $root -Recurse -Verbose:$Verbose;
             [ArrayList]$directoryList = New-Object ArrayList
-            $directoryList.AddRange(($directories | Where-Object {
+            $toEnquque = @($directories | Where-Object {
                         return Test-Name $direcoryFilters $_.Name
-                    }));
+                    });
             [Queue]$directoryQueue = New-Object Queue
+            if ($toEnqueue) {
+                $length = $toEnqueue.Length
+                switch($length) {
+                    0 { return $directoryQueue; }
+                    1 { $directoryQueue.Enqueue($toEnquque); }
+                    default {
+                        $directoryList.AddRange($toEnqueue);
 
-            foreach ($item in $directoryList) {
-                $directoryQueue.Enqueue($item)
+                        foreach ($item in $directoryList) {
+                            $directoryQueue.Enqueue($item);
+                        }
+                    }
+                }
             }
 
             return $directoryQueue;
