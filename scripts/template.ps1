@@ -53,12 +53,14 @@ function Set-TemplateValues {
                 for($index=0; $index -lt $contents.Length; $index += 1) {
                     $line = $contents[$index]
 
-                    foreach($property in $properties) {
-                        while($line -match $property.Name) {
+                    $enumerator = $properties.GetEnumerator()
+                    while ($enumerator.MoveNext()) {
+                        $property = $enumerator.Current
+                        while($line -match $property.Key) {
                             $original = $line
-                            $line = $line.Replace($property.Name, $property.Value)
+                            $line = $line.Replace($property.Key, $property.Value)
                             $fileChanged = $true
-                            "Replaced ${property.Name} with ${property.Value} in $original"
+                            "Replaced ${property.Key} with ${property.Value} in $original"
                         }
                     }
 
