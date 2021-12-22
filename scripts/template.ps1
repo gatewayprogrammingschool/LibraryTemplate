@@ -202,6 +202,7 @@ function Set-TemplateValues {
         }
 
         function Get-DirectoriesToRename {
+            Set-Location $root
             # Each time we rename a directory we start over.
             $directories = Get-ChildItem -Directory -Path $root -Recurse -Verbose:$Verbose;
             [ArrayList]$directoryList = New-Object ArrayList
