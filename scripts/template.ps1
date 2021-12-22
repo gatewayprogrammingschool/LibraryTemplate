@@ -1,3 +1,6 @@
+using namespace System;
+using namespace System.Collections;
+
 class MergeResult {
     # Property: Holds original string
     [string] $OriginalString;
@@ -76,9 +79,9 @@ function Get-TemplateProperties {
 
 function Merge-TemplateString {
     param (
-        [System.Collections.IEnumerable]$props,
+        [IEnumerable]$props,
         [string]$originalString,
-        [switch]$Verbose=$false
+        [switch]$Verbose = $false
     )
     Write-Verbose -Verbose:$Verbose -Message "[Merge-TemplateString] Merging $originalString with [$props]"
 
@@ -95,9 +98,10 @@ function Merge-TemplateString {
     [MergeResult]$mergeResult = New-Object MergeResult -ArgumentList $originalString, $newString;
 
     if ($mergeResult.IsChanged()) {
-        Write-Verbose -Verbose:$Verbose -Message "[Merge-TemplateString] Merged   : `"${mergeResult.OriginalString}`" to `"${mergeResult.NewString}`""
-    } else {
-        Write-Verbose -Verbose:$Verbose -Message "[Merge-TemplateString] Unchanged: `"${mergeResult.OriginalString}`""
+        Write-Verbose -Verbose:$Verbose -Message "[Merge-TemplateString] Merged   : `"$($mergeResult.OriginalString)`" to `"$($mergeResult.NewString)`""
+    }
+    else {
+        Write-Verbose -Verbose:$Verbose -Message "[Merge-TemplateString] Unchanged: `"$($mergeResult.OriginalString)`""
     }
 
     return $mergeResult;
@@ -110,7 +114,7 @@ function Set-TemplateValues {
     )
 
     $properties = Get-TemplateProperties
-    [MergeResult]$merged=$null;
+    [MergeResult]$merged = $null;
 
     if ($properties) {
         $root = $PWD
@@ -134,6 +138,7 @@ function Set-TemplateValues {
                     if ($merged -and $merged.IsChanged()) {
                         $contents[$index] = $merged.NewString
                         $fileChanged = $true;
+                        Write-Verbose -Verbose:$Verbose -Message "[Set-TemplateValues] Line Changed: `"$($merged.OriginalString)`" => `"$($merged.NewString)`""
                     }
                 }
 
@@ -163,20 +168,57 @@ function Set-TemplateValues {
                 Merge-TemplateString $properties $fileName -Verbose:$Verbose | Set-Variable merged -Force
 
                 if ($merged -and $merged.IsChanged()) {
-                    Rename-Item "${merged.OriginalString}" "${merged.NewString}" -Path $PWD -Verbose:$Verbose -WhatIf:$WhatIf
-                    "Renamed File from ${merged.OriginalString} to ${merged.NewString}: $(${merged.Changed} -eq (Test-Path ${merged.NewString}))"
+                    Rename-Item $merged.OriginalString $merged.NewString -Path $PWD -Verbose:$Verbose -WhatIf:$WhatIf
+                    "Renamed File from `"$($merged.OriginalString)`" to `"$($merged.NewString)`": $($merged.Changed -eq (Test-Path $merged.NewString))"
                 }
             }
         }
 
         Write-Verbose -Verbose:$Verbose -Message '[Set-TemplateValues] Completed processing files.'
 
+        $direcoryFilters = @();
+        $enumerator = $properties.GetEnumerator()
+        while ($enumerator.MoveNext()) {
+            $direcoryFilters += $enumerator.Current.Key
+        }
+
+        function Test-Name {
+            param(
+                [string[]]$patterns,
+                [string]$name
+            )
+
+            foreach ($pattern in $patterns) {
+                if ($name -match $pattern) {
+                    return $true;
+                }
+            }
+
+            return $false;
+        }
+
         # Each time we rename a directory we start over.
-        $directory = Get-ChildItem -Directory -Path $root -Recurse -Verbose:$Verbose | Select-Object -First 1
+        $directories = Get-ChildItem -Directory -Path $root -Recurse -Verbose:$Verbose;
+        [ArrayList]$directoryList = New-Object ArrayList
+        $directoryList.AddRange(($directories | Where-Object {
+                    return Test-Name $direcoryFilters $_.Name
+                }));
+        [Queue]$directoryQueue = New-Object Queue
 
-        Write-Verbose -Verbose:$Verbose "[Set-TemplateValues] `$directory: [$directory]"
+        foreach ($item in $directoryList) {
+            $directoryQueue.Enqueue($item)
+        }
 
-        do {
+        if ($directoryQueue.Count -gt 0) {
+            $directory = $directoryQueue.Dequeue()
+        }
+        else {
+            $directory = $null
+        }
+
+        while ($null -ne $directory) {
+            Write-Verbose -Verbose:$Verbose "[Set-TemplateValues] `$directory: [$directory]"
+
             try {
                 Push-Location
                 if ($directory) {
@@ -188,7 +230,7 @@ function Set-TemplateValues {
                         if ($merged.IsChanged()) {
                             Set-Location ${directory.Parent}
                             Rename-Item $merged.OriginalString $merged.NewString -Verbose:$Verbose
-                            "Renamed Directory from ${merged.OriginalString} to ${merged.NewString}: $(${merged.Changed} -eq (TestPath $merged.NewString))"
+                            "Renamed Directory from ${merged.OriginalString} to ${merged.NewString}: $(${merged.Changed} -eq (Test-Path $merged.NewString))"
                         }
                     }
                     elseif ($merged.IsChanged()) {
@@ -200,11 +242,16 @@ function Set-TemplateValues {
                 Pop-Location
             }
 
-            $directories = Get-ChildItem -Directory -Recurse -Verbose:$Verbose | Select-Object -First 1
-        } until ((-not $directories) -or ($directories.Length -eq 0))
+            if ($directoryQueue.Count -gt 0) {
+                $directory = $directoryQueue.Dequeue()
+            }
+            else {
+                $directory = $null
+            }
+        }
 
-        Write-Verbose -Verbose:$Verbose -Message "Completed processing directories."
+        Write-Verbose -Verbose:$Verbose -Message 'Completed processing directories.'
     }
 }
 
-Set-TemplateValues -WhatIf -Verbose
+Set-TemplateValues -Verbose
