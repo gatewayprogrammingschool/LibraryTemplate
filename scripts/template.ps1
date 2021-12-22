@@ -210,8 +210,11 @@ function Set-TemplateValues {
             $directories | Where-Object {
                         $tested = Test-Name $direcoryFilters $_.Name
                         if($tested) {
-                            if(-not $ignoreList.Contains($_.FullName)) {
+                            $isIgnored = $ignoreList.Contains($_.FullName) || $ignoreList -eq $_.FullName
+                            if(-not $isIgnored) {
                                 $toEnqueue.Add($_);
+                            } else {
+                                "Ignoring [$_]"
                             }
                         }
                     };
@@ -220,7 +223,7 @@ function Set-TemplateValues {
                 $length = $toEnqueue.Count;
                 switch ($length) {
                     0 { return $directoryQueue; }
-                    1 { $directoryQueue.Enqueue($toEnquque); }
+                    1 { $directoryQueue.Enqueue($toEnqueue); }
                     default {
                         foreach ($item in $toEnqueue) {
                             $directoryQueue.Enqueue($item);
