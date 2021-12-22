@@ -235,7 +235,7 @@ function Set-TemplateValues {
                     if ($merged.IsChanged()) {
                         Set-Location ${directory.Parent} -Verbose:$Verbose
                         $to = $merged.NewString
-                        $directory | Rename-Item $to -ErrorAction Stop -Verbose:$Verbose -WhatIf:$WhatIf
+                        $directory | Rename-Item -NewName $to -ErrorAction Stop -Verbose:$Verbose -WhatIf:$WhatIf
                         $newPath = Join-Path $directory.PSParentPath -Child $to
                         $newPathItem = Get-Item $newPath -ErrorAction Stop -Verbose:$Verbose
 
