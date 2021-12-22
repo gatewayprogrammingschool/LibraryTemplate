@@ -278,4 +278,4 @@ function Set-TemplateValues {
     }
 }
 
-Set-TemplateValues -Verbose
+Set-TemplateValues
