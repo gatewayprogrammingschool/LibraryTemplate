@@ -5,7 +5,8 @@ on:
     types:
       - created
   workflow_dispatch:
-  push: [main,master]
+  push:
+    branches: [ main, master ]
 
 jobs:
   build:
