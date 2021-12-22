@@ -255,7 +255,7 @@ function Set-TemplateValues {
                         $newPathItem = Get-Item $newPath -ErrorAction Stop -Verbose:$Verbose
 
                         if($newPathItem) {
-                            "Renamed Directory from $directory to ${to}: $(${merged.Changed})"
+                            "Renamed Directory from [$directory] to [${to}]."
                         } else {
                             throw "Failed to rename [$directory] to [$to]."
                         }
