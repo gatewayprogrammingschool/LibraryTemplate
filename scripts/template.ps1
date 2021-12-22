@@ -217,7 +217,7 @@ function Set-TemplateValues {
             return $directoryQueue;
         }
 
-        $queue = Get-DirectoriesToRename;
+        [Queue]$queue = Get-DirectoriesToRename;
 
         while ($queue.Count -gt 0) {
             Write-Verbose -Verbose:$Verbose "[Set-TemplateValues] `$directory: [$directory]"
