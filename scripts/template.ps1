@@ -118,7 +118,7 @@ function Set-TemplateValues {
 
     if ($properties) {
         $root = $PWD
-        $files = Get-ChildItem *.cs, *.sln, *.md, *.yml, *.json -Recurse -Verbose:$Verbose
+        $files = Get-ChildItem *.cs, *.sln, *.md, *.yml, *.json -File -Recurse -Verbose:$Verbose
 
         if ($files) {
             $files | ForEach-Object -Process {
@@ -168,8 +168,12 @@ function Set-TemplateValues {
                 Merge-TemplateString $properties $fileName -Verbose:$Verbose | Set-Variable merged -Force
 
                 if ($merged -and $merged.IsChanged()) {
-                    Rename-Item $merged.OriginalString $merged.NewString -Path $PWD -Verbose:$Verbose -WhatIf:$WhatIf
-                    "Renamed File from `"$($merged.OriginalString)`" to `"$($merged.NewString)`": $($merged.Changed -eq (Test-Path $merged.NewString))"
+                    $to = $merged.NewString
+                    $file | Rename-Item -NewName $to -Verbose:$Verbose -WhatIf:$WhatIf -ErrorAction Stop
+                    $to = Join-Path $file.PSParentPath -ChildPath $to
+                    $newFile = Get-Item $to -ErrorAction Stop -Verbose:$Verbose
+                    $wasRenamed = $merged.Changed -and ($null -ne $newFile);
+                    "Renamed File from `"$($merged.OriginalString)`" to `"$($merged.NewString)`": $wasRenamed"
                 }
             }
         }
@@ -197,56 +201,56 @@ function Set-TemplateValues {
             return $false;
         }
 
-        # Each time we rename a directory we start over.
-        $directories = Get-ChildItem -Directory -Path $root -Recurse -Verbose:$Verbose;
-        [ArrayList]$directoryList = New-Object ArrayList
-        $directoryList.AddRange(($directories | Where-Object {
-                    return Test-Name $direcoryFilters $_.Name
-                }));
-        [Queue]$directoryQueue = New-Object Queue
+        function Get-DirectoriesToRename {
+            # Each time we rename a directory we start over.
+            $directories = Get-ChildItem -Directory -Path $root -Recurse -Verbose:$Verbose;
+            [ArrayList]$directoryList = New-Object ArrayList
+            $directoryList.AddRange(($directories | Where-Object {
+                        return Test-Name $direcoryFilters $_.Name
+                    }));
+            [Queue]$directoryQueue = New-Object Queue
 
-        foreach ($item in $directoryList) {
-            $directoryQueue.Enqueue($item)
+            foreach ($item in $directoryList) {
+                $directoryQueue.Enqueue($item)
+            }
+
+            return $directoryQueue;
         }
 
-        if ($directoryQueue.Count -gt 0) {
-            $directory = $directoryQueue.Dequeue()
-        }
-        else {
-            $directory = $null
-        }
+        $queue = Get-DirectoriesToRename;
 
-        while ($null -ne $directory) {
+        while ($queue.Count -gt 0) {
             Write-Verbose -Verbose:$Verbose "[Set-TemplateValues] `$directory: [$directory]"
 
             try {
                 Push-Location
+
+                $directory = $queue.Dequeue()
                 if ($directory) {
                     $directoryName = $directory.Name
 
-                    Merge-TemplateString $properties $directoryName -Verbose:$Verbose | Set-Variable merged -Force
+                    Merge-TemplateString $properties $directoryName -Verbose:$Verbose `
+                    | Set-Variable merged -Force
 
-                    if (-not $WhatIf) {
-                        if ($merged.IsChanged()) {
-                            Set-Location ${directory.Parent}
-                            Rename-Item $merged.OriginalString $merged.NewString -Verbose:$Verbose
-                            "Renamed Directory from ${merged.OriginalString} to ${merged.NewString}: $(${merged.Changed} -eq (Test-Path $merged.NewString))"
+                    if ($merged.IsChanged()) {
+                        Set-Location ${directory.Parent} -Verbose:$Verbose
+                        $to = $merged.NewString
+                        $directory | Rename-Item $to -ErrorAction Stop -Verbose:$Verbose -WhatIf:$WhatIf
+                        $newPath = Join-Path $directory.PSParentPath -Child $to
+                        $newPathItem = Get-Item $newPath -ErrorAction Stop -Verbose:$Verbose
+
+                        if($newPathItem) {
+                            "Renamed Directory from $directory to ${to}: $(${merged.Changed})"
+                        } else {
+                            throw "Failed to rename [$directory] to [$to]."
                         }
-                    }
-                    elseif ($merged.IsChanged()) {
-                        "WhatIf: ${merged.OriginalString} would be renamed to ${merged.NewString}"
+
+                        $queue = Get-DirectoriesToRename;
                     }
                 }
             }
             finally {
                 Pop-Location
-            }
-
-            if ($directoryQueue.Count -gt 0) {
-                $directory = $directoryQueue.Dequeue()
-            }
-            else {
-                $directory = $null
             }
         }
 
