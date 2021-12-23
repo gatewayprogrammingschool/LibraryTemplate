@@ -1,8 +1,8 @@
-using System.Reflection;
+﻿using System.Reflection;
 
-namespace YourProjectId;
+namespace LibraryTemplate;
 
-public static class YourProjectIdExtensions
+public static class LibraryTemplateExtensions
 {
     public static TReturn? AsType<TSource, TReturn>(
         this TSource source
