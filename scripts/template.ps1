@@ -353,10 +353,10 @@ function Set-TemplateValues {
 
     if ($properties) {
 
-        [bool]$valuesChanged = Merge-TemplateDirectories -WhatIf:$WhatIf -Verbose:$Verbose
-        $valuesChanged = $valuesChanged -or (Merge-TemplateFiles -WhatIf:$WhatIf -Verbose:$Verbose)
+        [bool]$directoriesChanged = Merge-TemplateDirectories -WhatIf:$WhatIf -Verbose:$Verbose
+        [bool]$filesChanged = Merge-TemplateFiles -WhatIf:$WhatIf -Verbose:$Verbose
 
-        if($valuesChanged) {
+        if ($directoriesChanged -or $filesChanged) {
             Write-Information "[Set-TemplateValues] Changes were applied in template files.  Check your work!"
         } else {
             Write-Information '[Set-TemplateValues] No Changes were applied in template files.'
