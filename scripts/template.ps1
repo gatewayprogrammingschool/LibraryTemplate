@@ -49,6 +49,12 @@ class MergeResult {
         $this.OriginalString = $original
         $this.NewString = $new
     }
+
+    # Constructor: Creates a new MyClass object, with the specified name
+    MergeResult() {
+        $this.OriginalString = $null
+        $this.NewString = $null
+    }
 }
 
 function Get-TemplateProperties {
@@ -127,7 +133,8 @@ function Get-DirectoriesToRename {
 
     $directories | Where-Object {
         $directory = $_;
-        $tested = Test-Name $directoryFilters $directory.Name
+        $directoryName = Split-Path $directory.PSPath -Leaf
+        $tested = Test-Name $directoryFilters $directoryName
         if ($tested) {
             $currentFullName = $directory.PSPath;
             $ignoredLength = $ignoreList.Length;
@@ -180,6 +187,7 @@ function Test-Name {
 
 function Merge-TemplateString {
     param (
+        [MergeResult]$mergeResult,
         [IEnumerable]$props,
         [string]$originalString,
         [switch]$Verbose = $false
@@ -197,7 +205,10 @@ function Merge-TemplateString {
         }
     }
 
-    [MergeResult]$mergeResult = New-Object MergeResult -ArgumentList $originalString, $newString;
+    # [MergeResult]$mergeResult = New-Object MergeResult -ArgumentList $originalString, $newString;
+
+    $mergeResult.NewString = $newString;
+    $mergeResult.OriginalString = $originalString;
 
     if ($mergeResult.IsChanged()) {
         Write-Verbose -Verbose:$Verbose -Message "[Merge-TemplateString] Merged   : `"$($mergeResult.OriginalString)`" to `"$($mergeResult.NewString)`""
@@ -205,8 +216,6 @@ function Merge-TemplateString {
     else {
         Write-Verbose -Verbose:$Verbose -Message "[Merge-TemplateString] Unchanged: `"$($mergeResult.OriginalString)`""
     }
-
-    return $mergeResult;
 }
 
 function Merge-FileName {
@@ -218,9 +227,9 @@ function Merge-FileName {
     )
 
     [bool]$valuesChanged = $false;
-    [MergeResult]$merged = $null;
+    [MergeResult]$merged = New-Object MergeResult;
 
-    Merge-TemplateString $Properties $FileName -Verbose:$Verbose | Set-Variable merged -Force
+    Merge-TemplateString $merged $Properties $FileName -Verbose:$Verbose
 
     if ($merged -and $merged.IsChanged()) {
         $valuesChanged = $true;
@@ -247,15 +256,16 @@ function Merge-FileContents {
     $fileChanged = $false;
 
     if (-not $fileName.EndsWith('.csproj', [StringComparison]::OrdinalIgnoreCase)) {
-        $contents = $File | Get-Content -Verbose:$Verbose
+        $fileFullName = $File.FullName;
+        $contents = Get-Content $fileFullName -Verbose:$Verbose
 
         Write-Verbose -Verbose:$Verbose -Message "[Merge-TemplateFiles] Searching in $file [${contents.Length} lines]"
 
         for ($index = 0; $index -lt $contents.Length; $index += 1) {
             $line = $contents[$index]
 
-            [MergeResult]$merged = $null;
-            Merge-TemplateString $Properties $line | Set-Variable merged -Force
+            [MergeResult]$merged = New-Object MergeResult;
+            Merge-TemplateString $merged $Properties $line
 
             if ($merged -and $merged.IsChanged()) {
                 $contents[$index] = $merged.NewString
@@ -312,8 +322,8 @@ function Merge-TemplateDirectories {
             if ($directory) {
                 $directoryName = $directory.Name
 
-                Merge-TemplateString $properties $directoryName -Verbose:$Verbose `
-                | Set-Variable merged -Force > $null
+                [MergeResult]$merged = New-Object MergeResult;
+                Merge-TemplateString $merged $properties $directoryName -Verbose:$Verbose
 
                 if ($merged.IsChanged()) {
                     $path = $directory.Parent
@@ -385,14 +395,17 @@ function Merge-TemplateFiles {
                 -Verbose:$Verbose `
                 -WhatIf:$WhatIf
 
-            return $valuesChange `
+            $valuesChanged = $valuesChange `
                 -or $fileNamesChanged `
                 -or $fileContentsChanged;
-        } `
-        | Set-Variable $valuesChanged
+        }
     }
 
-    Write-Verbose -Verbose:$Verbose -Message '[Merge-TemplateFiles] Completed processing files.'
+    Write-Information -Verbose:$Verbose -Message '[Merge-TemplateFiles] Completed processing files.'
+
+    if($Errors.Length -gt 0) {
+        $Errors
+    }
 
     return $valuesChanged
 }
