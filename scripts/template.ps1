@@ -101,6 +101,7 @@ function Get-TemplateProperties {
 
 function Get-DirectoriesToRename {
     param(
+        [Queue]$queue,
         [switch]$WhatIf = $false,
         [switch]$Verbose = $false
     )
@@ -297,7 +298,7 @@ function Merge-TemplateDirectories {
     [Queue]$queue = New-Object Queue
 
     $ignoreList = @();
-    Write-Information "[Merge-TemplateDirectories] Get-DirectoriesToRename: $(Get-DirectoriesToRename)"
+    Write-Information "[Merge-TemplateDirectories] Get-DirectoriesToRename: $(Get-DirectoriesToRename $queue)"
 
     while ($queue.Count -gt 0) {
         Write-Verbose -Verbose:$Verbose -Message "[Merge-TemplateDirectories] `$directory: [$directory]"
@@ -335,7 +336,7 @@ function Merge-TemplateDirectories {
                         }
                     }
 
-                    Get-DirectoriesToRename > $null
+                    Get-DirectoriesToRename $queue > $null
                 }
             }
         }
