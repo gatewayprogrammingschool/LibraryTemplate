@@ -221,6 +221,7 @@ function Merge-TemplateString {
 function Merge-FileName {
     param(
         [hashtable]$Properties,
+        [hashtable]$FileMap,
         [string]$Filename,
         [switch]$WhatIf = $false,
         [switch]$Verbose = $false
@@ -237,6 +238,7 @@ function Merge-FileName {
         $file | Rename-Item -NewName $to -Verbose:$Verbose -WhatIf:$WhatIf -ErrorAction Stop
         $to = Join-Path $file.PSParentPath -ChildPath $to
         $newFile = Get-Item $to -ErrorAction Stop -Verbose:$Verbose
+        $FileMap.Add($file, $newFile)
         $wasRenamed = $merged.Changed -and ($null -ne $newFile);
         Write-Information "[Merge-TemplateFiles] Renamed File from `"$($merged.OriginalString)`" to `"$($merged.NewString)`": $wasRenamed"
     }
@@ -334,12 +336,13 @@ function Merge-TemplateDirectories {
                         $ignoreList += $directory;
                     }
                     else {
-                        $directory | Rename-Item -NewName $to -ErrorAction Stop -Verbose:$Verbose -WhatIf:$WhatIf > $null
+                        Copy-Item $directory $to -Recurse -Force -ErrorAction Stop -Verbose:$Verbose -WhatIf:$WhatIf
                         $newPath = Join-Path $directory.PSParentPath -Child $to
                         $newPathItem = Get-Item $newPath -ErrorAction Stop -Verbose:$Verbose
 
                         if ($newPathItem) {
                             $valuesChanged = $true;
+                            Remove-Item $directory -Recurse -Force -ErrorAction Stop -Verbose:$Verbose -WhatIf:$WhatIf
                             Write-Information "[Merge-TemplateDirectories] Renamed Directory from [$directory] to [${to}]."
                         }
                         else {
@@ -378,6 +381,8 @@ function Merge-TemplateFiles {
 
     $files = Get-ChildItem $fileFilters -File -Recurse -Verbose:$Verbose
 
+    $fileMap = @{}
+
     if ($files) {
         $enumerator = $files.GetEnumerator();
         while ($enumerator.MoveNext()) {
@@ -385,9 +390,14 @@ function Merge-TemplateFiles {
 
             $fileNamesChanged = Merge-FileName `
                 -Properties $properties `
+                -FileMap $fileMap `
                 -Filename $file.Name `
                 -Verbose:$Verbose `
                 -WhatIf:$WhatIf
+
+            if($fileNamesChanged) {
+                $file = $fileMap[$file]
+            }
 
             $fileContentsChanged = Merge-FileContents `
                 -Properties $properties `
