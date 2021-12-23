@@ -342,6 +342,8 @@ function Merge-TemplateDirectories {
 
                         if ($newPathItem) {
                             $valuesChanged = $true;
+                            $newPathItemPath = $newPathItem.Path
+                            git add "${newPathItemPath}/*"
                             Remove-Item $directory -Recurse -Force -ErrorAction Stop -Verbose:$Verbose -WhatIf:$WhatIf
                             Write-Information "[Merge-TemplateDirectories] Renamed Directory from [$directory] to [${to}]."
                         }
