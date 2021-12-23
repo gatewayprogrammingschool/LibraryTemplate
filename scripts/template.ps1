@@ -1,6 +1,9 @@
 using namespace System;
 using namespace System.Collections;
 
+$ErrorActionPreference='Break'
+$ErrorView='DetailedView'
+
 class MergeResult {
     # Property: Holds original string
     [string] $OriginalString;
@@ -113,7 +116,8 @@ function Set-TemplateValues {
         [switch]$Verbose = $false
     )
 
-    $ignoreList = @("");
+    $valuesChanged = $false
+    $ignoreList = @();
     $properties = Get-TemplateProperties
     [MergeResult]$merged = $null;
 
@@ -145,6 +149,7 @@ function Set-TemplateValues {
 
                 if (-not $WhatIf) {
                     if ($fileChanged) {
+                        $valuesChanged = $true;
                         $contents | Out-File $file -Verbose:$Verbose
 
                         "Updated contents of $file"
@@ -169,6 +174,7 @@ function Set-TemplateValues {
                 Merge-TemplateString $properties $fileName -Verbose:$Verbose | Set-Variable merged -Force
 
                 if ($merged -and $merged.IsChanged()) {
+                    $valuesChanged = $true;
                     $to = $merged.NewString
                     $file | Rename-Item -NewName $to -Verbose:$Verbose -WhatIf:$WhatIf -ErrorAction Stop
                     $to = Join-Path $file.PSParentPath -ChildPath $to
@@ -202,15 +208,29 @@ function Set-TemplateValues {
             return $false;
         }
 
+        [Queue]$queue = New-Object Queue
+
         function Get-DirectoriesToRename {
-            Set-Location $root
+            Set-Location $root > $null
             # Each time we rename a directory we start over.
             $directories = Get-ChildItem -Directory -Path $root -Recurse -Verbose:$Verbose;
             [ArrayList]$toEnqueue = New-Object ArrayList
             $directories | Where-Object {
                         $tested = Test-Name $direcoryFilters $_.Name
                         if($tested) {
-                            $isIgnored = $ignoreList.Contains($_.FullName) || $ignoreList -eq $_.FullName
+                            $currentFullName = $_.PSPath;
+                            $ignoredLength = $ignoreList.Length;
+                            switch($ignoredLength) {
+                                0 { $isIgnored = $false; }
+                                1 {
+                                    $ignorePath = $ignoreList[0].PSPath;
+                                    $isIgnored = $ignorePath -eq $currentFullName
+                                }
+                                default {
+                                    $ignoreMatches = $ignoreList | Where-Object{ $_.PSPath -eq $currentFullName }
+                                    $isIgnored = ($ignoreMatches -and ($ignoreMatches.Length -gt 0))
+                                }
+                            }
                             if(-not $isIgnored) {
                                 $toEnqueue.Add($_);
                             } else {
@@ -218,15 +238,20 @@ function Set-TemplateValues {
                             }
                         }
                     };
-            [Queue]$directoryQueue = New-Object Queue
+
+            $queue.Clear();
+
+            # [Queue]$directoryQueue = New-Object Queue
             if ($null -ne $toEnqueue) {
                 $length = $toEnqueue.Count;
                 switch ($length) {
-                    0 { return $directoryQueue; }
-                    1 { $directoryQueue.Enqueue($toEnqueue); }
+                    0 { return; }
+                    1 {
+                        $queue.Enqueue($toEnqueue) > $null
+                    }
                     default {
                         foreach ($item in $toEnqueue) {
-                            $directoryQueue.Enqueue($item);
+                            $queue.Enqueue($item) > $null
                         }
                     }
                 }
@@ -234,45 +259,45 @@ function Set-TemplateValues {
             else {
 
             }
-
-            return $directoryQueue;
         }
 
-        [Queue]$queue = Get-DirectoriesToRename;
+        Get-DirectoriesToRename  > $null
 
         while ($queue.Count -gt 0) {
-            Write-Verbose -Verbose:$Verbose "[Set-TemplateValues] `$directory: [$directory]"
+            Write-Verbose -Verbose:$Verbose -Message "[Set-TemplateValues] `$directory: [$directory]"
 
             try {
-                Push-Location
+                Push-Location > $null
 
-                $directory = $queue.Dequeue()
+                $directoryFullPath = $queue.Dequeue()
+                $directory = Get-Item $directoryFullPath
                 if ($directory) {
                     $directoryName = $directory.Name
 
                     Merge-TemplateString $properties $directoryName -Verbose:$Verbose `
-                    | Set-Variable merged -Force
+                        | Set-Variable merged -Force  > $null
 
                     if ($merged.IsChanged()) {
                         $path = $directory.Parent
-                        Set-Location $path -Verbose:$Verbose
+                        Set-Location $path > $null
                         $to = $merged.NewString
                         if(Test-Path $to) {
-                            "[$PWD\$to] already exists.  Skipping [$directory]."
+                            Write-Verbose -Verbose:$Verbose -Message "[$PWD\$to] already exists.  Skipping [$directory]."
                             $ignoreList += $directory;
                         } else {
-                            $directory | Rename-Item -NewName $to -ErrorAction Stop -Verbose:$Verbose -WhatIf:$WhatIf
+                            $directory | Rename-Item -NewName $to -ErrorAction Stop -Verbose:$Verbose -WhatIf:$WhatIf > $null
                             $newPath = Join-Path $directory.PSParentPath -Child $to
                             $newPathItem = Get-Item $newPath -ErrorAction Stop -Verbose:$Verbose
 
                             if($newPathItem) {
+                                $valuesChanged = $true;
                                 "Renamed Directory from [$directory] to [${to}]."
                             } else {
                                 throw "Failed to rename [$directory] to [$to]."
                             }
                         }
 
-                        $queue = Get-DirectoriesToRename;
+                        Get-DirectoriesToRename > $null
                     }
                 }
             }
@@ -282,11 +307,17 @@ function Set-TemplateValues {
                 throw $Err
             }
             finally {
-                Pop-Location
+                Pop-Location > $null
             }
         }
 
-        Write-Verbose -Verbose:$Verbose -Message 'Completed processing directories.'
+        Write-Verbose -Verbose:$Verbose -Message '[Set-TemplateValues] Completed processing directories.'
+
+        if($valuesChanged) {
+            "[Set-TemplateValues] Changes were applied in template files.  Check your work!"
+        } else {
+            '[Set-TemplateValues] No Changes were applied in template files.'
+        }
     }
 }
 
