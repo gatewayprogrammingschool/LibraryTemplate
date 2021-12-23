@@ -6,8 +6,8 @@ param(
     [switch]$Verbose = $false
 )
 
-$ErrorActionPreference='Break'
-$ErrorView='DetailedView'
+$ErrorActionPreference = 'Break'
+$ErrorView = 'DetailedView'
 
 $root = $PWD
 $valuesChanged = $false
@@ -52,40 +52,129 @@ class MergeResult {
 }
 
 function Get-TemplateProperties {
-    Push-Location
-    $ScriptDirName = Split-Path $script:MyInvocation.MyCommand.Path
-    if ($ScriptDirName -ine 'scripts') {
-        $scriptsDir = Get-ChildItem scripts -Path $PWD -ErrorAction Stop
+    param(
+        [switch]$WhatIf = $false,
+        [switch]$Verbose = $false
+    )
 
-        if (-not $scriptsDir) {
-            throw 'Cannot locate scripts directory.'
+    try {
+        Push-Location > $null
+
+        $ScriptDirName = Split-Path $script:MyInvocation.MyCommand.Path
+        if ($ScriptDirName -ine 'scripts') {
+            $scriptsDir = Get-ChildItem scripts -Path $PWD -ErrorAction Stop
+
+            if (-not $scriptsDir) {
+                throw 'Cannot locate scripts directory.'
+            }
+        }
+        else {
+            $scriptsDir = Get-Item $PWD
+        }
+
+        $scriptsParentDir = $scriptsDir.PSParentPath
+
+        Set-Location $scriptsParentDir
+
+        $propsFile = Get-ChildItem Directory.Build.props -ErrorAction Stop
+
+        if (-not $propsFile) {
+            throw "Cannot locate Directory.Build.props in $scriptsParentDir"
+        }
+
+        [xml]$props = Get-Content $propsFile
+
+        $group = $props.Project.PropertyGroup
+
+        $properties = @{}
+        $group.ChildNodes | ForEach-Object -Process {
+            $element = $_
+            $properties.Add($element.Name, $element.InnerText)
+        }
+
+        return $properties;
+    }
+    finally {
+        Pop-Location > $null
+    }
+}
+
+function Get-DirectoriesToRename {
+    param(
+        [switch]$WhatIf = $false,
+        [switch]$Verbose = $false
+    )
+
+    [ArrayList]$toEnqueue = New-Object ArrayList
+    [string[]]$directoryFilters = @();
+
+    $queue.Clear();
+
+    $enumerator = $properties.GetEnumerator()
+    while ($enumerator.MoveNext()) {
+        $directoryFilters += $enumerator.Current.Key
+    }
+
+    Set-Location $root > $null
+
+    $directories = `
+        Get-ChildItem `
+            -Directory `
+            -Path $root `
+            -Recurse `
+            -Verbose:$Verbose;
+
+    $directories | Where-Object {
+        $directory = $_;
+        $tested = Test-Name $directoryFilters $directory.Name
+        if ($tested) {
+            $currentFullName = $directory.PSPath;
+            $ignoredLength = $ignoreList.Length;
+            switch ($ignoredLength) {
+                0 {
+                    $isIgnored = $false;
+                }
+                1 {
+                    $ignorePath = $ignoreList[0].PSPath;
+                    $isIgnored = $ignorePath -eq $currentFullName
+                }
+                default {
+                    $ignoreMatches = $ignoreList | Where-Object { $_.PSPath -eq $currentFullName }
+                    $isIgnored = ($ignoreMatches -and ($ignoreMatches.Length -gt 0))
+                }
+            }
+            if (-not $isIgnored) {
+                $toEnqueue.Add($directory);
+            }
+            else {
+                Write-Information "[Get-DirectoriesToRename] Ignoring [$directory]"
+            }
+        }
+    };
+
+    if ($null -ne $toEnqueue) {
+        $enumerator = $toEnqueue.GetEnumerator()
+        while ($enumerator.MoveNext()) {
+            $queue.Enqueue($enumerator.Current.Key);
         }
     }
-    else {
-        $scriptsDir = Get-Item $PWD
+}
+
+function Test-Name {
+    param(
+        [string[]]$patterns,
+        [string]$name,
+        [switch]$WhatIf = $false,
+        [switch]$Verbose = $false
+    )
+
+    foreach ($pattern in $patterns) {
+        if ($name -match $pattern) {
+            return $true;
+        }
     }
 
-    $scriptsParentDir = $scriptsDir.PSParentPath
-
-    Set-Location $scriptsParentDir
-
-    $propsFile = Get-ChildItem Directory.Build.props -ErrorAction Stop
-
-    if (-not $propsFile) {
-        throw "Cannot locate Directory.Build.props in $scriptsParentDir"
-    }
-
-    [xml]$props = Get-Content $propsFile
-
-    $group = $props.Project.PropertyGroup
-
-    $properties = @{}
-    $group.ChildNodes | ForEach-Object -Process {
-        $element = $_
-        $properties.Add($element.Name, $element.InnerText)
-    }
-
-    $properties
+    return $false;
 }
 
 function Merge-TemplateString {
@@ -97,6 +186,7 @@ function Merge-TemplateString {
     Write-Verbose -Verbose:$Verbose -Message "[Merge-TemplateString] Merging $originalString with [$props]"
 
     $newString = $originalString
+
     $enumerator = $props.GetEnumerator()
     while ($enumerator.MoveNext()) {
         $property = $enumerator.Current
@@ -118,84 +208,86 @@ function Merge-TemplateString {
     return $mergeResult;
 }
 
-function Test-Name {
+function Merge-FileName {
     param(
-        [string[]]$patterns,
-        [string]$name,
+        [hashtable]$Properties,
+        [string]$Filename,
         [switch]$WhatIf = $false,
         [switch]$Verbose = $false
     )
 
-    foreach ($pattern in $patterns) {
-        if ($name -match $pattern) {
-            return $true;
-        }
+    [bool]$valuesChanged = $false;
+    [MergeResult]$merged = $null;
+
+    Merge-TemplateString $Properties $FileName -Verbose:$Verbose | Set-Variable merged -Force
+
+    if ($merged -and $merged.IsChanged()) {
+        $valuesChanged = $true;
+        $to = $merged.NewString
+        $file | Rename-Item -NewName $to -Verbose:$Verbose -WhatIf:$WhatIf -ErrorAction Stop
+        $to = Join-Path $file.PSParentPath -ChildPath $to
+        $newFile = Get-Item $to -ErrorAction Stop -Verbose:$Verbose
+        $wasRenamed = $merged.Changed -and ($null -ne $newFile);
+        Write-Information "[Merge-TemplateFiles] Renamed File from `"$($merged.OriginalString)`" to `"$($merged.NewString)`": $wasRenamed"
     }
 
-    return $false;
+    return $valuesChanged
 }
 
-function Get-DirectoriesToRename {
+function Merge-FileContents {
     param(
+        [hashtable]$Properties,
+        [IO.FileInfo]$File,
         [switch]$WhatIf = $false,
         [switch]$Verbose = $false
     )
 
-    [ArrayList]$toEnqueue = New-Object ArrayList
+    $fileChanged = $false;
 
-    Set-Location $root > $null
+    if (-not $fileName.EndsWith('.csproj', [StringComparison]::OrdinalIgnoreCase)) {
+        $contents = $File | Get-Content -Verbose:$Verbose
 
-    $directories = Get-ChildItem -Directory -Path $root -Recurse -Verbose:$Verbose;
+        Write-Verbose -Verbose:$Verbose -Message "[Merge-TemplateFiles] Searching in $file [${contents.Length} lines]"
 
-    $directories | Where-Object {
-        $tested = Test-Name $direcoryFilters $_.Name
-        if ($tested) {
-            $currentFullName = $_.PSPath;
-            $ignoredLength = $ignoreList.Length;
-            switch ($ignoredLength) {
-                0 {
-                    $isIgnored = $false;
-                }
-                1 {
-                    $ignorePath = $ignoreList[0].PSPath;
-                    $isIgnored = $ignorePath -eq $currentFullName
-                }
-                default {
-                    $ignoreMatches = $ignoreList | Where-Object { $_.PSPath -eq $currentFullName }
-                    $isIgnored = ($ignoreMatches -and ($ignoreMatches.Length -gt 0))
-                }
-            }
-            if (-not $isIgnored) {
-                $toEnqueue.Add($_);
-            }
-            else {
-                Write-Information "[Get-DirectoriesToRename] Ignoring [$_]"
+        for ($index = 0; $index -lt $contents.Length; $index += 1) {
+            $line = $contents[$index]
+
+            [MergeResult]$merged = $null;
+            Merge-TemplateString $Properties $line | Set-Variable merged -Force
+
+            if ($merged -and $merged.IsChanged()) {
+                $contents[$index] = $merged.NewString
+                $fileChanged = $true;
+                Write-Verbose -Verbose:$Verbose -Message "[Merge-TemplateFiles] Line Changed: `"$($merged.OriginalString)`" => `"$($merged.NewString)`""
             }
         }
-    };
 
-    $queue.Clear();
+        if (-not $WhatIf) {
+            if ($fileChanged) {
+                $contents | Out-File $file -Verbose:$Verbose
 
-    if ($null -ne $toEnqueue) {
-        $length = $toEnqueue.Count;
-        switch ($length) {
-            0 {
-                return;
+                Write-Information "[Merge-TemplateFiles] Updated contents of $file"
             }
-            1 {
-                $queue.Enqueue($toEnqueue) > $null
-            }
-            default {
-                foreach ($item in $toEnqueue) {
-                    $queue.Enqueue($item) > $null
+        }
+        else {
+            switch ($fileChanged) {
+                $true {
+                    Write-Information "[Merge-TemplateFiles] WhatIf: $fileName would be changed."
+                }
+
+                default {
+                    Write-Information "[Merge-TemplateFiles] WhatIf: $fileName would not be changed."
                 }
             }
         }
     }
+
+    return $fileChanged
 }
 
 function Merge-TemplateDirectories {
     param(
+        [hashtable]$Properties,
         [switch]$WhatIf = $false,
         [switch]$Verbose = $false
     )
@@ -205,14 +297,7 @@ function Merge-TemplateDirectories {
     [Queue]$queue = New-Object Queue
 
     $ignoreList = @();
-
-    $direcoryFilters = @();
-    $enumerator = $properties.GetEnumerator()
-    while ($enumerator.MoveNext()) {
-        $direcoryFilters += $enumerator.Current.Key
-    }
-
-    Get-DirectoriesToRename > $null
+    Write-Information "[Merge-TemplateDirectories] Get-DirectoriesToRename: $(Get-DirectoriesToRename)"
 
     while ($queue.Count -gt 0) {
         Write-Verbose -Verbose:$Verbose -Message "[Merge-TemplateDirectories] `$directory: [$directory]"
@@ -264,78 +349,45 @@ function Merge-TemplateDirectories {
         }
     }
 
-    Write-Verbose -Verbose:$Verbose -Message '[Merge-TemplateDirectories] Completed processing directories.'
+    Write-Information '[Merge-TemplateDirectories] Completed processing directories.'
 
     return $valuesChanged;
 }
 
 function Merge-TemplateFiles {
     param(
+        [hashtable]$Properties,
         [switch]$WhatIf = $false,
         [switch]$Verbose = $false
     )
 
     [bool]$valuesChanged = $false;
-    $files = Get-ChildItem *.cs, *.sln, *.md, *.yml, *.json -File -Recurse -Verbose:$Verbose
+    $fileFilters = @('*.cs', '*.sln', '*.md', '*.yml', '*.json', '*.csproj')
+
+    $files = Get-ChildItem $fileFilters -File -Recurse -Verbose:$Verbose
 
     if ($files) {
-        $files | ForEach-Object -Process {
-            $file = $_
+        $files `
+            | ForEach-Object -Process {
+                $file = $_
 
-            $contents = $file | Get-Content -Verbose:$Verbose
+                $fileNamesChanged = Merge-FileName `
+                    -Properties $properties `
+                    -Filename $file.Name `
+                    -Verbose:$Verbose `
+                    -WhatIf:$WhatIf
 
-            $fileChanged = $false;
+                $fileContentsChanged = Merge-FileContents `
+                    -Properties $properties `
+                    -File $file `
+                    -Verbose:$Verbose `
+                    -WhatIf:$WhatIf
 
-            Write-Verbose -Verbose:$Verbose -Message "[Merge-TemplateFiles] Searching in $file [${contents.Length} lines]"
-
-            for ($index = 0; $index -lt $contents.Length; $index += 1) {
-                $line = $contents[$index]
-
-                Merge-TemplateString $properties $line | Set-Variable merged -Force
-
-                if ($merged -and $merged.IsChanged()) {
-                    $contents[$index] = $merged.NewString
-                    $fileChanged = $true;
-                    Write-Verbose -Verbose:$Verbose -Message "[Merge-TemplateFiles] Line Changed: `"$($merged.OriginalString)`" => `"$($merged.NewString)`""
-                }
-            }
-
-            if (-not $WhatIf) {
-                if ($fileChanged) {
-                    $valuesChanged = $true;
-                    $contents | Out-File $file -Verbose:$Verbose
-
-                    Write-Information "[Merge-TemplateFiles] Updated contents of $file"
-                    Write-Verbose -Verbose:$Verbose -Message "[Merge-TemplateFiles] New Contents for ${fileName}:$([System.Environment]::NewLine)${contents}"
-                }
-            }
-            else {
-                switch ($fileChanged) {
-                    $true {
-                        Write-Information "[Merge-TemplateFiles] WhatIf: $fileName would be changed."
-                        Write-Verbose -Verbose:$Verbose -Message "[Merge-TemplateFiles] WhatIf: New Contents for ${fileName}:$([System.Environment]::NewLine)${contents}"
-                    }
-
-                    default {
-                        Write-Information "[Merge-TemplateFiles] WhatIf: $fileName would not be changed."
-                    }
-                }
-            }
-
-            $fileName = $file.Name
-
-            Merge-TemplateString $properties $fileName -Verbose:$Verbose | Set-Variable merged -Force
-
-            if ($merged -and $merged.IsChanged()) {
-                $valuesChanged = $true;
-                $to = $merged.NewString
-                $file | Rename-Item -NewName $to -Verbose:$Verbose -WhatIf:$WhatIf -ErrorAction Stop
-                $to = Join-Path $file.PSParentPath -ChildPath $to
-                $newFile = Get-Item $to -ErrorAction Stop -Verbose:$Verbose
-                $wasRenamed = $merged.Changed -and ($null -ne $newFile);
-                Write-Information "[Merge-TemplateFiles] Renamed File from `"$($merged.OriginalString)`" to `"$($merged.NewString)`": $wasRenamed"
-            }
-        }
+                return $valuesChange `
+                        -or $fileNamesChanged `
+                        -or $fileContentsChanged;
+            } `
+            | Set-Variable $valuesChanged
     }
 
     Write-Verbose -Verbose:$Verbose -Message '[Merge-TemplateFiles] Completed processing files.'
@@ -353,12 +405,22 @@ function Set-TemplateValues {
 
     if ($properties) {
 
-        [bool]$directoriesChanged = Merge-TemplateDirectories -WhatIf:$WhatIf -Verbose:$Verbose
-        [bool]$filesChanged = Merge-TemplateFiles -WhatIf:$WhatIf -Verbose:$Verbose
+        [bool]$directoriesChanged = `
+            Merge-TemplateDirectories `
+                -Properties $properties
+                -WhatIf:$WhatIf `
+                -Verbose:$Verbose
+
+        [bool]$filesChanged = `
+            Merge-TemplateFiles `
+                -Properties $properties
+                -WhatIf:$WhatIf `
+                -Verbose:$Verbose
 
         if ($directoriesChanged -or $filesChanged) {
-            Write-Information "[Set-TemplateValues] Changes were applied in template files.  Check your work!"
-        } else {
+            Write-Information '[Set-TemplateValues] Changes were applied in template files.  Check your work!'
+        }
+        else {
             Write-Information '[Set-TemplateValues] No Changes were applied in template files.'
         }
     }
