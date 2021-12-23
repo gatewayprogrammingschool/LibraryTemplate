@@ -1,4 +1,4 @@
-﻿namespace LibraryTemplate.Tests;
+namespace YourProjectId.Tests;
 
 public record TestObject(int IntProperty, TestObject? ParentProperty)
 {

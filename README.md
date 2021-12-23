@@ -1,4 +1,4 @@
-# LibraryTemplate
+# YourProjectId
 
 Describe the project.
 
@@ -6,13 +6,13 @@ Describe the project.
 
 | Technical | Social |
 |---|---|
-| [![.NET](https://github.com/gatewayprogrammingschool/LibraryTemplate/actions/workflows/dotnet.yml/badge.svg)](https://github.com/gatewayprogrammingschool/LibraryTemplate/actions/workflows/dotnet.yml) | [![Repo Stars](https://img.shields.io/github/stars/gatewayprogrammingschool/LibraryTemplate?label=Repository%20Stars&style=plastic)](https://github.com/gatewayprogrammingschool/LibraryTemplate) |
-| [![Codacy Security Scan](https://github.com/gatewayprogrammingschool/LibraryTemplate/actions/workflows/codacy-analysis.yml/badge.svg)](https://github.com/gatewayprogrammingschool/LibraryTemplate/actions/workflows/codacy-analysis.yml) | [![NuGet Version](https://img.shields.io/nuget/vpre/LibraryTemplate)](https://www.nuget.org/packages/LibraryTemplate/) |
-| [![CodeQL](https://github.com/gatewayprogrammingschool/LibraryTemplate/actions/workflows/codeql-analysis.yml/badge.svg)](https://github.com/gatewayprogrammingschool/LibraryTemplate/actions/workflows/codeql-analysis.yml) | [![Discussions](https://img.shields.io/github/discussions/gatewayprogrammingschool/LibraryTemplate)](https://github.com/gatewayprogrammingschool/LibraryTemplate/discussions) |
+| [![.NET](https://github.com/gatewayprogrammingschool/YourProjectId/actions/workflows/dotnet.yml/badge.svg)](https://github.com/gatewayprogrammingschool/YourProjectId/actions/workflows/dotnet.yml) | [![Repo Stars](https://img.shields.io/github/stars/gatewayprogrammingschool/YourProjectId?label=Repository%20Stars&style=plastic)](https://github.com/gatewayprogrammingschool/YourProjectId) |
+| [![Codacy Security Scan](https://github.com/gatewayprogrammingschool/YourProjectId/actions/workflows/codacy-analysis.yml/badge.svg)](https://github.com/gatewayprogrammingschool/YourProjectId/actions/workflows/codacy-analysis.yml) | [![NuGet Version](https://img.shields.io/nuget/vpre/YourProjectId)](https://www.nuget.org/packages/YourProjectId/) |
+| [![CodeQL](https://github.com/gatewayprogrammingschool/YourProjectId/actions/workflows/codeql-analysis.yml/badge.svg)](https://github.com/gatewayprogrammingschool/YourProjectId/actions/workflows/codeql-analysis.yml) | [![Discussions](https://img.shields.io/github/discussions/gatewayprogrammingschool/YourProjectId)](https://github.com/gatewayprogrammingschool/YourProjectId/discussions) |
 
 ## Example Usage - Use Case 1
 
-[Source](https://github.com/gatewayprogrammingschool/LibraryTemplate/blob/main/tests/LibraryTemplate.Tests/TestObject.cs) for `TestObject`
+[Source](https://github.com/gatewayprogrammingschool/YourProjectId/blob/main/tests/YourProjectId.Tests/TestObject.cs) for `TestObject`
 
 ```csharp
 

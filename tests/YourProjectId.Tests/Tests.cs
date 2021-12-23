@@ -1,13 +1,13 @@
-﻿namespace LibraryTemplate.Tests;
+namespace YourProjectId.Tests;
 
-public class LibraryTemplateTests
+public class YourProjectIdTests
 {
     public ITestOutputHelper Output
     {
         get;
     }
 
-    public LibraryTemplateTests(ITestOutputHelper output)
+    public YourProjectIdTests(ITestOutputHelper output)
     {
         Output = output;
         Output.WriteLine($"{MethodBase.GetCurrentMethod()?.Name ?? "<<unknown>>"} has completed successfully");

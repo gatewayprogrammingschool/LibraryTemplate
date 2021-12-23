@@ -337,12 +337,12 @@ function Merge-TemplateDirectories {
                     }
                     else {
                         Copy-Item $directory $to -Recurse -Force -ErrorAction Stop -Verbose:$Verbose -WhatIf:$WhatIf
-                        $newPath = Join-Path $directory.PSParentPath -Child $to
-                        $newPathItem = Get-Item $newPath -ErrorAction Stop -Verbose:$Verbose
+                        $newPath = Join-Path $directory.PSParentPath.Replace('Microsoft.PowerShell.Core\FileSystem::', '') -Child $to
+                        [System.IO.DirectoryInfo]$newPathItem = New-Object System.IO.DirectoryInfo -ArgumentList $newPath
 
                         if ($newPathItem) {
                             $valuesChanged = $true;
-                            $newPathItemPath = $newPathItem.Path
+                            $newPathItemPath = $newPathItem.FullName
                             git add "${newPathItemPath}/*"
                             Remove-Item $directory -Recurse -Force -ErrorAction Stop -Verbose:$Verbose -WhatIf:$WhatIf
                             Write-Information "[Merge-TemplateDirectories] Renamed Directory from [$directory] to [${to}]."
