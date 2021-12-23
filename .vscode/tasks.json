@@ -7,7 +7,7 @@
             "type": "process",
             "args": [
                 "build",
-                "${workspaceFolder}/LibraryTemplate.sln",
+                "${workspaceFolder}/YourProjectId.sln",
                 "/property:GenerateFullPaths=true",
                 "/consoleloggerparameters:NoSummary"
             ],
@@ -24,7 +24,7 @@
             "args": [
                 "watch",
                 "run",
-                "${workspaceFolder}/LibraryTemplate.sln",
+                "${workspaceFolder}/YourProjectId.sln",
                 "/property:GenerateFullPaths=true",
                 "/consoleloggerparameters:NoSummary"
             ],

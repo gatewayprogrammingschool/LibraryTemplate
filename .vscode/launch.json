@@ -9,9 +9,9 @@
             "type": "coreclr",
             "request": "launch",
             "preLaunchTask": "build",
-            "program": "${workspaceFolder}/tests/LibraryTemplate.Tests/bin/Debug/net6.0/LibraryTemplate.Tests.dll",
+            "program": "${workspaceFolder}/tests/YourProjectId.Tests/bin/Debug/net6.0/YourProjectId.Tests.dll",
             "args": [],
-            "cwd": "${workspaceFolder}/tests/LibraryTemplate.Tests",
+            "cwd": "${workspaceFolder}/tests/YourProjectId.Tests",
             "console": "internalConsole",
             "stopAtEntry": false
         },

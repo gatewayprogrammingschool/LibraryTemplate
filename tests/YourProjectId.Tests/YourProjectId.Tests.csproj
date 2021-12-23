@@ -22,7 +22,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\src\LibraryTemplate\LibraryTemplate.csproj" />
+    <ProjectReference Include="..\..\src\$(LibraryTemplate)\$(LibraryTemplate).csproj" />
   </ItemGroup>
 
 </Project>
