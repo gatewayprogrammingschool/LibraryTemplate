@@ -58,6 +58,7 @@ class MergeResult {
 
 function Get-TemplateProperties {
     [CmdletBinding(SupportsShouldProcess)]
+    [OutputType([Hashtable])]
     param(
     )
 
@@ -404,7 +405,7 @@ function Merge-TemplateFiles {
         }
     }
 
-    Write-Information -Verbose:$Verbose -Message '[Merge-TemplateFiles] Completed processing files.'
+    Write-Information '[Merge-TemplateFiles] Completed processing files.'
 
     if ($Errors.Length -gt 0) {
         $Errors
