@@ -1,9 +1,8 @@
 using namespace System;
 using namespace System.Collections;
 
+[CmdletBinding(SupportsShouldProcess)]
 param(
-    [switch]$WhatIf = $false,
-    [switch]$Verbose = $false
 )
 
 $ErrorActionPreference = 'Break'
@@ -58,9 +57,8 @@ class MergeResult {
 }
 
 function Get-TemplateProperties {
+    [CmdletBinding(SupportsShouldProcess)]
     param(
-        [switch]$WhatIf = $false,
-        [switch]$Verbose = $false
     )
 
     try {
@@ -106,10 +104,9 @@ function Get-TemplateProperties {
 }
 
 function Get-DirectoriesToRename {
+    [CmdletBinding(SupportsShouldProcess)]
     param(
-        [Queue]$queue,
-        [switch]$WhatIf = $false,
-        [switch]$Verbose = $false
+        [Queue]$queue
     )
 
     [ArrayList]$toEnqueue = New-Object ArrayList
@@ -169,11 +166,10 @@ function Get-DirectoriesToRename {
 }
 
 function Test-Name {
+    [CmdletBinding(SupportsShouldProcess)]
     param(
         [string[]]$patterns,
-        [string]$name,
-        [switch]$WhatIf = $false,
-        [switch]$Verbose = $false
+        [string]$name
     )
 
     foreach ($pattern in $patterns) {
@@ -186,11 +182,10 @@ function Test-Name {
 }
 
 function Merge-TemplateString {
+    [CmdletBinding(SupportsShouldProcess)]
     param (
         [MergeResult]$mergeResult,
-        [IEnumerable]$props,
-        [string]$originalString,
-        [switch]$Verbose = $false
+        [IEnumerable]$props
     )
     Write-Verbose -Verbose:$Verbose -Message "[Merge-TemplateString] Merging $originalString with [$props]"
 
@@ -219,18 +214,17 @@ function Merge-TemplateString {
 }
 
 function Merge-FileName {
+    [CmdletBinding(SupportsShouldProcess)]
     param(
         [hashtable]$Properties,
         [hashtable]$FileMap,
-        [string]$Filename,
-        [switch]$WhatIf = $false,
-        [switch]$Verbose = $false
+        [string]$Filename
     )
 
     [bool]$valuesChanged = $false;
     [MergeResult]$merged = New-Object MergeResult;
 
-    Merge-TemplateString $merged $Properties $FileName -Verbose:$Verbose
+    Merge-TemplateString -MergeResult $merged -Props $Properties -OriginalString $FileName -Verbose:$Verbose
 
     if ($merged -and $merged.IsChanged()) {
         $valuesChanged = $true;
@@ -247,11 +241,10 @@ function Merge-FileName {
 }
 
 function Merge-FileContents {
+    [CmdletBinding(SupportsShouldProcess)]
     param(
         [hashtable]$Properties,
-        [IO.FileInfo]$File,
-        [switch]$WhatIf = $false,
-        [switch]$Verbose = $false
+        [IO.FileInfo]$File
     )
 
     $fileName = $file.Name
@@ -267,7 +260,7 @@ function Merge-FileContents {
             $line = $contents[$index]
 
             [MergeResult]$merged = New-Object MergeResult;
-            Merge-TemplateString $merged $Properties $line
+            Merge-TemplateString -MergeBase $merged -Props $Properties -OriginalString $line
 
             if ($merged -and $merged.IsChanged()) {
                 $contents[$index] = $merged.NewString
@@ -300,10 +293,9 @@ function Merge-FileContents {
 }
 
 function Merge-TemplateDirectories {
+    [CmdletBinding(SupportsShouldProcess)]
     param(
-        [hashtable]$Properties,
-        [switch]$WhatIf = $false,
-        [switch]$Verbose = $false
+        [hashtable]$Properties
     )
 
     [bool]$valuesChanged = $false;
@@ -325,7 +317,7 @@ function Merge-TemplateDirectories {
                 $directoryName = $directory.Name
 
                 [MergeResult]$merged = New-Object MergeResult;
-                Merge-TemplateString $merged $properties $directoryName -Verbose:$Verbose
+                Merge-TemplateString -MergeResult $merged -Props $properties -OriginalString $directoryName -Verbose:$Verbose
 
                 if ($merged.IsChanged()) {
                     $path = $directory.Parent
@@ -372,10 +364,9 @@ function Merge-TemplateDirectories {
 }
 
 function Merge-TemplateFiles {
+    [CmdletBinding(SupportsShouldProcess)]
     param(
-        [hashtable]$Properties,
-        [switch]$WhatIf = $false,
-        [switch]$Verbose = $false
+        [hashtable]$Properties
     )
 
     [bool]$valuesChanged = $false;
@@ -423,9 +414,8 @@ function Merge-TemplateFiles {
 }
 
 function Set-TemplateValues {
+    [CmdletBinding(SupportsShouldProcess)]
     param(
-        [switch]$WhatIf = $false,
-        [switch]$Verbose = $false
     )
 
     $properties = Get-TemplateProperties
