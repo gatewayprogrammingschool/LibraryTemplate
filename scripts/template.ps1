@@ -397,7 +397,7 @@ function Merge-TemplateFiles {
                 -Verbose:$Verbose `
                 -WhatIf:$WhatIf
 
-            if($fileNamesChanged) {
+            if ($fileNamesChanged) {
                 $file = $fileMap[$file]
             }
 
@@ -415,7 +415,7 @@ function Merge-TemplateFiles {
 
     Write-Information -Verbose:$Verbose -Message '[Merge-TemplateFiles] Completed processing files.'
 
-    if($Errors.Length -gt 0) {
+    if ($Errors.Length -gt 0) {
         $Errors
     }
 
