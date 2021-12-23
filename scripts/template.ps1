@@ -120,10 +120,10 @@ function Get-DirectoriesToRename {
 
     $directories = `
         Get-ChildItem `
-            -Directory `
-            -Path $root `
-            -Recurse `
-            -Verbose:$Verbose;
+        -Directory `
+        -Path $root `
+        -Recurse `
+        -Verbose:$Verbose;
 
     $directories | Where-Object {
         $directory = $_;
@@ -156,7 +156,7 @@ function Get-DirectoriesToRename {
     if ($null -ne $toEnqueue) {
         $enumerator = $toEnqueue.GetEnumerator()
         while ($enumerator.MoveNext()) {
-            $queue.Enqueue($enumerator.Current.Key);
+            $queue.Enqueue($enumerator.Current);
         }
     }
 }
@@ -243,6 +243,7 @@ function Merge-FileContents {
         [switch]$Verbose = $false
     )
 
+    $fileName = $file.Name
     $fileChanged = $false;
 
     if (-not $fileName.EndsWith('.csproj', [StringComparison]::OrdinalIgnoreCase)) {
@@ -368,27 +369,27 @@ function Merge-TemplateFiles {
     $files = Get-ChildItem $fileFilters -File -Recurse -Verbose:$Verbose
 
     if ($files) {
-        $files `
-            | ForEach-Object -Process {
-                $file = $_
+        $enumerator = $files.GetEnumerator();
+        while ($enumerator.MoveNext()) {
+            $file = $enumerator.Current;
 
-                $fileNamesChanged = Merge-FileName `
-                    -Properties $properties `
-                    -Filename $file.Name `
-                    -Verbose:$Verbose `
-                    -WhatIf:$WhatIf
+            $fileNamesChanged = Merge-FileName `
+                -Properties $properties `
+                -Filename $file.Name `
+                -Verbose:$Verbose `
+                -WhatIf:$WhatIf
 
-                $fileContentsChanged = Merge-FileContents `
-                    -Properties $properties `
-                    -File $file `
-                    -Verbose:$Verbose `
-                    -WhatIf:$WhatIf
+            $fileContentsChanged = Merge-FileContents `
+                -Properties $properties `
+                -File $file `
+                -Verbose:$Verbose `
+                -WhatIf:$WhatIf
 
-                return $valuesChange `
-                        -or $fileNamesChanged `
-                        -or $fileContentsChanged;
-            } `
-            | Set-Variable $valuesChanged
+            return $valuesChange `
+                -or $fileNamesChanged `
+                -or $fileContentsChanged;
+        } `
+        | Set-Variable $valuesChanged
     }
 
     Write-Verbose -Verbose:$Verbose -Message '[Merge-TemplateFiles] Completed processing files.'
@@ -408,15 +409,15 @@ function Set-TemplateValues {
 
         [bool]$directoriesChanged = `
             Merge-TemplateDirectories `
-                -Properties $properties
-                -WhatIf:$WhatIf `
-                -Verbose:$Verbose
+            -Properties $properties `
+            -WhatIf:$WhatIf `
+            -Verbose:$Verbose
 
         [bool]$filesChanged = `
             Merge-TemplateFiles `
-                -Properties $properties
-                -WhatIf:$WhatIf `
-                -Verbose:$Verbose
+            -Properties $properties `
+            -WhatIf:$WhatIf `
+            -Verbose:$Verbose
 
         if ($directoriesChanged -or $filesChanged) {
             Write-Information '[Set-TemplateValues] Changes were applied in template files.  Check your work!'
